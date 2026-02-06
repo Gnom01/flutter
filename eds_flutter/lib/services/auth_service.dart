@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import '../models/user.dart';
 
 class AuthService {
   // Getter to determine the base URL based on environment
@@ -17,54 +18,73 @@ class AuthService {
         return 'http://localhost:8080';
       }
     }
-    
+
     // For production/release builds or when not in debug mode
     return 'https://panelklienta.egurrola.com';
   }
-  
+
   // Login method
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
+      final url = '$baseUrl/api/login';
+      print('🔵 [AUTH] Attempting login to: $url');
+      print('🔵 [AUTH] Email: $email');
+
       final response = await http.post(
-        Uri.parse('$baseUrl/api/login'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
+        body: jsonEncode({'Email': email, 'Password': password}),
       );
+
+      print('🟢 [AUTH] Response status: ${response.statusCode}');
+      print('🟢 [AUTH] Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        // Save token
+
+        // Parse user data
+        final user = User.fromJson(data['user']);
+
+        // Save token and user
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', data['token']);
-        await prefs.setString('user', jsonEncode(data['user']));
-        
-        return {'success': true, 'data': data};
+        await prefs.setString('user', jsonEncode(user.toJson()));
+
+        print('✅ [AUTH] Login successful');
+        print('✅ [AUTH] User roles: ${user.role}');
+        return {'success': true, 'user': user, 'data': data};
       } else {
-        return {
-          'success': false,
-          'message': 'Nieprawidłowy email lub hasło'
-        };
+        print('❌ [AUTH] Login failed with status: ${response.statusCode}');
+        return {'success': false, 'message': 'Nieprawidłowy email lub hasło'};
+      }
+    } catch (e, stackTrace) {
+      print('🔴 [AUTH] Exception occurred: $e');
+      print('🔴 [AUTH] Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // Get current user
+  Future<User?> getCurrentUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString('user');
+      if (userJson != null) {
+        return User.fromJson(jsonDecode(userJson));
       }
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Błąd połączenia: ${e.toString()}'
-      };
+      print('Error getting current user: $e');
     }
+    return null;
   }
 
   // Logout method
   Future<void> logout() async {
     try {
       final token = await getToken();
-      
       if (token != null) {
         // Call logout endpoint to invalidate token on server
         await http.post(

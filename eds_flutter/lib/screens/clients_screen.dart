@@ -46,7 +46,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (result['message']?.contains('Sesja wygasła') == true) {
         _handleLogout();
       } else {
@@ -89,23 +89,22 @@ class _ClientsScreenState extends State<ClientsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF6366F1),
-              Color(0xFFF9FAFB),
-            ],
-            stops: [0.0, 0.3],
-          ),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFFF9FAFB)),
         child: SafeArea(
           child: Column(
             children: [
-              // Header
               Container(
                 padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -113,24 +112,28 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Klienci',
+                          'KLIENCI',
                           style: GoogleFonts.lato(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFFE20613),
+                            letterSpacing: 1.2,
                           ),
                         ),
                         Text(
-                          '${_filteredClients.length} klientów',
+                          '${_filteredClients.length} osób',
                           style: GoogleFonts.lato(
-                            fontSize: 14,
-                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                       ],
                     ),
                     IconButton(
-                      icon: Icon(Icons.logout, color: Colors.white),
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFE20613),
+                      ),
                       onPressed: _handleLogout,
                       tooltip: 'Wyloguj',
                     ),
@@ -146,7 +149,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   decoration: InputDecoration(
                     hintText: 'Szukaj klienta...',
                     hintStyle: GoogleFonts.lato(color: Colors.grey.shade400),
-                    prefixIcon: Icon(Icons.search, color: Color(0xFF6366F1)),
+                    prefixIcon: Icon(Icons.search, color: Color(0xFFE20613)),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -175,44 +178,44 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   child: _isLoading
                       ? Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF6366F1),
+                            color: Color(0xFFE20613),
                           ),
                         )
                       : _filteredClients.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.people_outline,
-                                    size: 80,
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _searchQuery.isEmpty
-                                        ? 'Brak klientów'
-                                        : 'Nie znaleziono klientów',
-                                    style: GoogleFonts.lato(
-                                      fontSize: 18,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 80,
+                                color: Colors.grey.shade300,
                               ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _loadClients,
-                              color: Color(0xFF6366F1),
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(20),
-                                itemCount: _filteredClients.length,
-                                itemBuilder: (context, index) {
-                                  final client = _filteredClients[index];
-                                  return _buildClientCard(client);
-                                },
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isEmpty
+                                    ? 'Brak klientów'
+                                    : 'Nie znaleziono klientów',
+                                style: GoogleFonts.lato(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
-                            ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadClients,
+                          color: Color(0xFFE20613),
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(20),
+                            itemCount: _filteredClients.length,
+                            itemBuilder: (context, index) {
+                              final client = _filteredClients[index];
+                              return _buildClientCard(client);
+                            },
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -253,12 +256,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Color(0xFF6366F1),
-                        Color(0xFF8B5CF6),
-                      ],
-                    ),
+                    color: const Color(0xFFE20613),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -388,10 +386,12 @@ class _ClientsScreenState extends State<ClientsScreen> {
             const SizedBox(height: 24),
             _buildDetailRow(Icons.person, 'Imię i nazwisko', client.name),
             _buildDetailRow(Icons.email, 'Email', client.email),
-            if (client.phone != null)
+            if (client.phone != null && client.phone!.isNotEmpty)
               _buildDetailRow(Icons.phone, 'Telefon', client.phone!),
-            if (client.address != null)
-              _buildDetailRow(Icons.location_on, 'Adres', client.address!),
+            if (client.fullAddress.isNotEmpty)
+              _buildDetailRow(Icons.location_on, 'Adres', client.fullAddress),
+            if (client.nip != null && client.nip!.isNotEmpty)
+              _buildDetailRow(Icons.business, 'NIP', client.nip!),
             const SizedBox(height: 24),
           ],
         ),
@@ -408,10 +408,10 @@ class _ClientsScreenState extends State<ClientsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Color(0xFF6366F1).withOpacity(0.1),
+              color: Color(0xFFE20613).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 20, color: Color(0xFF6366F1)),
+            child: Icon(icon, size: 20, color: Color(0xFFE20613)),
           ),
           const SizedBox(width: 12),
           Expanded(

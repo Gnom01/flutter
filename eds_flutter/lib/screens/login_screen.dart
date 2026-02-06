@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
-import 'clients_screen.dart';
+import 'main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,8 +46,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (result['success'] == true) {
+      final user = result['user'];
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ClientsScreen()),
+        MaterialPageRoute(
+          builder: (context) => MainNavigationScreen(user: user),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -67,11 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF6366F1),
-              Color(0xFF8B5CF6),
-              Color(0xFFEC4899),
-            ],
+            colors: [Color.fromARGB(255, 228, 228, 228), Color(0xFF111827)],
           ),
         ),
         child: SafeArea(
@@ -81,37 +80,19 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo/Title
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Icon(
-                      Icons.school,
-                      size: 80,
-                      color: Colors.white,
+                    child: Image.asset(
+                      'assets/icon/logo.png',
+                      width: 350,
+                      height: 250,
                     ),
                   ),
                   const SizedBox(height: 30),
-                  Text(
-                    'Panel Klienta',
-                    style: GoogleFonts.lato(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Egurrola Dance Studio',
-                    style: GoogleFonts.lato(
-                      fontSize: 16,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                  const SizedBox(height: 50),
 
                   // Login Form
                   Container(
@@ -149,8 +130,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
                               labelText: 'Email',
-                              labelStyle: GoogleFonts.lato(),
-                              prefixIcon: Icon(Icons.email_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -162,11 +141,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Color(0xFF6366F1),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE20613),
                                   width: 2,
                                 ),
                               ),
+                              prefixIcon: const Icon(
+                                Icons.email_outlined,
+                                color: Colors.grey,
+                              ),
+                              labelStyle: const TextStyle(color: Colors.grey),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -212,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: Color(0xFF6366F1),
+                                  color: Color(0xFFE20613),
                                   width: 2,
                                 ),
                               ),
@@ -232,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _handleLogin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF6366F1),
+                                backgroundColor: Color(0xFFE20613),
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -247,8 +231,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         strokeWidth: 2.5,
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : Text(
