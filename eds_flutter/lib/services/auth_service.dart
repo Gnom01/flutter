@@ -12,9 +12,17 @@ class AuthService {
   static String get baseUrl {
     if (kDebugMode) {
       if (Platform.isAndroid) {
-        return 'https://api.egurrola-app.pl';
+        // return 'https://api.egurrola-app.pl';
+        // docker
+        // return 'http://10.0.2.2:8080';
+        // lockal
+        return 'http://10.0.2.2:8000';
       } else if (Platform.isIOS) {
-        return 'https://api.egurrola-app.pl';
+        // return 'https://api.egurrola-app.pl';
+        // docker
+        // return 'http://localhost:8080';
+        // lockal
+        return 'http://localhost:8000';
       }
     }
 

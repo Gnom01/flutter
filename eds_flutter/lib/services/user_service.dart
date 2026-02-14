@@ -107,4 +107,61 @@ class UserService {
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
     }
   }
+
+  // Fetch payment schedule
+  Future<Map<String, dynamic>> getPaymentSchedule() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        AuthService.logoutAndRedirect();
+        return {'success': false, 'message': 'Brak autoryzacji'};
+      }
+
+      final url = '${AuthService.baseUrl}/api/payments/schedule';
+      print('🔵 [USER] Fetching payment schedule from: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print(
+        '🟢 [USER] Payment schedule response status: ${response.statusCode}',
+      );
+      print('📄 [USER] Payment schedule body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Handle nested structure: {body: {success: true, data: {...}}}
+        var scheduleData = data;
+        if (data['body'] != null) {
+          scheduleData = data['body'];
+        }
+        if (scheduleData['data'] != null) {
+          scheduleData = scheduleData['data'];
+        }
+
+        return {'success': true, 'data': scheduleData};
+      } else if (response.statusCode == 401) {
+        AuthService.logoutAndRedirect();
+        return {
+          'success': false,
+          'message': 'Sesja wygasła. Zaloguj się ponownie.',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Błąd pobierania harmonogramu: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('🔴 [USER] Payment Schedule Exception: $e');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
 }

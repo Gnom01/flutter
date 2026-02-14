@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/placeholder_screen.dart';
+import '../payment_schedule_screen.dart';
 
 // Dashboard Screen
 class ParentDashboardScreen extends StatelessWidget {
@@ -17,10 +18,7 @@ class ParentPaymentsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PlaceholderScreen(
-      title: 'Płatności / Historia',
-      icon: Icons.credit_card_outlined,
-    );
+    return const PaymentScheduleScreen();
   }
 }
 
