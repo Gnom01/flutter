@@ -3,24 +3,22 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../main.dart';
 import '../models/user.dart';
+import '../screens/login_screen.dart';
 
 class AuthService {
-  // Getter to determine the base URL based on environment
   static String get baseUrl {
-    // Check if running in debug mode (local development)
     if (kDebugMode) {
-      // For Android emulator, use 10.0.2.2 to access host machine's localhost
-      // For iOS simulator or web, use localhost
       if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8080';
+        return 'https://api.egurrola-app.pl';
       } else if (Platform.isIOS) {
-        return 'http://localhost:8080';
+        return 'https://api.egurrola-app.pl';
       }
     }
 
-    // For production/release builds or when not in debug mode
-    return 'https://panelklienta.egurrola.com';
+    return 'https://api.egurrola-app.pl';
   }
 
   // Login method
@@ -117,5 +115,20 @@ class AuthService {
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
+  }
+
+  // Global session expiry handler
+  static Future<void> logoutAndRedirect() async {
+    final authService = AuthService();
+    await authService.logout();
+
+    // Use the global navigator key to go to login screen
+    final navigator = MyApp.navigatorKey.currentState;
+    if (navigator != null) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 }

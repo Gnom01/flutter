@@ -1,12 +1,12 @@
 class User {
-  final int id;
+  final String guid;
   final String email;
   final String firstName;
   final String lastName;
   final List<int> role;
 
   User({
-    required this.id,
+    required this.guid,
     required this.email,
     required this.firstName,
     required this.lastName,
@@ -24,23 +24,31 @@ class User {
   String get fullName => '$firstName $lastName';
 
   factory User.fromJson(Map<String, dynamic> json) {
-    // Parse roles from comma-separated string "1,2,3" to List<int>
+    // Parse roles
     List<int> rolesList = [];
-
-    // Check 'role' first (new preference), then fallback to 'roles'
     var rolesData = json['role'] ?? json['roles'];
 
-    if (rolesData != null && rolesData.toString().isNotEmpty) {
-      rolesList = rolesData
-          .toString()
-          .split(',')
-          .map((role) => int.tryParse(role.trim()) ?? 0)
-          .where((role) => role > 0)
-          .toList();
+    if (rolesData != null) {
+      if (rolesData is int) {
+        rolesList = [rolesData];
+      } else if (rolesData is List) {
+        rolesList = rolesData
+            .map((r) => int.tryParse(r.toString()) ?? 0)
+            .where((r) => r > 0)
+            .toList()
+            .cast<int>();
+      } else if (rolesData.toString().isNotEmpty) {
+        rolesList = rolesData
+            .toString()
+            .split(',')
+            .map((role) => int.tryParse(role.trim()) ?? 0)
+            .where((role) => role > 0)
+            .toList();
+      }
     }
 
     return User(
-      id: json['id'] ?? 0,
+      guid: json['guid'] ?? json['id']?.toString() ?? '',
       email: json['email'] ?? '',
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
@@ -50,7 +58,7 @@ class User {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'guid': guid,
       'email': email,
       'first_name': firstName,
       'last_name': lastName,

@@ -1,41 +1,26 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
+import '../models/user_profile.dart';
+import '../models/user_consents.dart';
 import 'auth_service.dart';
 
-class ClientService {
-  // Getter to determine the base URL based on environment
-  static String get baseUrl {
-    // Check if running in debug mode (local development)
-    if (kDebugMode) {
-      // For Android emulator, use 10.0.2.2 to access host machine's localhost
-      // For iOS simulator or web, use localhost
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8080';
-      } else if (Platform.isIOS) {
-        return 'http://localhost:8080';
-      }
-    }
-
-    // For production/release builds or when not in debug mode
-    return 'https://panelklienta.egurrola.com';
-  }
-
+class UserService {
   final AuthService _authService = AuthService();
 
-  // Get all clients
-  Future<Map<String, dynamic>> getClients() async {
+  // Fetch user profile
+  Future<Map<String, dynamic>> getUserProfile() async {
     try {
       final token = await _authService.getToken();
-      print(token);
       if (token == null) {
         AuthService.logoutAndRedirect();
         return {'success': false, 'message': 'Brak autoryzacji'};
       }
 
+      final url = '${AuthService.baseUrl}/api/user/profile';
+      print('🔵 [USER] Fetching profile from: $url');
+
       final response = await http.get(
-        Uri.parse('$baseUrl/api/clients'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -43,19 +28,16 @@ class ClientService {
         },
       );
 
+      print('🟢 [USER] Response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Check for different response structures
-        var clientsList = [];
-        if (data['clients'] != null) {
-          clientsList = data['clients'];
-        } else if (data['data'] != null) {
-          clientsList = data['data'];
-        } else if (data is List) {
-          clientsList = data;
+        if (data['success'] == true && data['user'] != null) {
+          final profile = UserProfile.fromJson(data['user']);
+          return {'success': true, 'profile': profile};
+        } else {
+          return {'success': false, 'message': 'Błąd przetwarzania danych'};
         }
-
-        return {'success': true, 'clients': clientsList};
       } else if (response.statusCode == 401) {
         AuthService.logoutAndRedirect();
         return {
@@ -63,42 +45,51 @@ class ClientService {
           'message': 'Sesja wygasła. Zaloguj się ponownie.',
         };
       } else {
-        return {'success': false, 'message': 'Błąd pobierania danych'};
+        return {
+          'success': false,
+          'message': 'Błąd pobierania profilu: ${response.statusCode}',
+        };
       }
     } catch (e) {
+      print('🔴 [USER] Exception: $e');
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
     }
   }
 
-  // Update client
-  Future<Map<String, dynamic>> updateClient(
-    String clientId,
-    Map<String, dynamic> data,
-  ) async {
+  // Fetch user consents
+  Future<Map<String, dynamic>> getUserConsents() async {
     try {
       final token = await _authService.getToken();
-
       if (token == null) {
         AuthService.logoutAndRedirect();
         return {'success': false, 'message': 'Brak autoryzacji'};
       }
 
-      final response = await http.put(
-        Uri.parse('$baseUrl/api/clients/$clientId'),
+      final url = '${AuthService.baseUrl}/api/user/consents';
+      print('🔵 [USER] Fetching consents from: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(data),
       );
 
+      print('🟢 [USER] Consents response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        return {
-          'success': true,
-          'client': responseData['client'] ?? responseData,
-        };
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['consents'] != null) {
+          final consents = UserConsents.fromJson(data['consents']);
+          return {'success': true, 'consents': consents};
+        } else {
+          return {
+            'success': false,
+            'message': 'Błąd przetwarzania danych zgód',
+          };
+        }
       } else if (response.statusCode == 401) {
         AuthService.logoutAndRedirect();
         return {
@@ -106,9 +97,13 @@ class ClientService {
           'message': 'Sesja wygasła. Zaloguj się ponownie.',
         };
       } else {
-        return {'success': false, 'message': 'Błąd aktualizacji danych'};
+        return {
+          'success': false,
+          'message': 'Błąd pobierania zgód: ${response.statusCode}',
+        };
       }
     } catch (e) {
+      print('🔴 [USER] Consents Exception: $e');
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
     }
   }

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/user.dart';
-import '../services/auth_service.dart';
-import 'login_screen.dart';
+import '../widgets/navigation_drawer.dart';
 
 // Child screens
 import 'child/child_screens.dart';
@@ -24,12 +23,11 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  final _authService = AuthService();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Get menu items based on user's primary role
   List<NavigationItem> get _menuItems {
     final primaryRole = widget.user.primaryRole;
-    print('🟢 [AUTH] Response body primaryRole: ${primaryRole}');
 
     if (primaryRole == 1) {
       // Child menu
@@ -57,12 +55,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           icon: Icons.chat_outlined,
           selectedIcon: Icons.chat,
           screen: const ChildContactInstructorScreen(),
-        ),
-        NavigationItem(
-          label: 'Pomoc',
-          icon: Icons.help_outline,
-          selectedIcon: Icons.help,
-          screen: const ChildHelpScreen(),
         ),
       ];
     } else if (primaryRole == 2) {
@@ -126,12 +118,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           selectedIcon: Icons.report,
           screen: const InstructorReportsScreen(),
         ),
-        NavigationItem(
-          label: 'Pomoc',
-          icon: Icons.help_outline,
-          selectedIcon: Icons.help,
-          screen: const InstructorHelpScreen(),
-        ),
       ];
     }
 
@@ -187,14 +173,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
           ),
-          _buildMoreMenuItem(
-            icon: Icons.help_outline,
-            title: 'Pomoc / Kontakt',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ParentHelpScreen()),
-            ),
-          ),
         ],
       ),
     );
@@ -227,42 +205,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Future<void> _handleLogout() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Wyloguj',
-          style: GoogleFonts.lato(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Czy na pewno chcesz się wylogować?',
-          style: GoogleFonts.lato(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Anuluj', style: GoogleFonts.lato(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Wyloguj',
-              style: GoogleFonts.lato(color: const Color(0xFFE20613)),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldLogout == true) {
-      await _authService.logout();
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    }
+  // Handles navigation when "Pulpit" is clicked in Drawer
+  void _onDrawerDashboardTap() {
+    setState(() {
+      _currentIndex = 0; // Switch to first tab (Dashboard)
+    });
   }
 
   @override
@@ -270,12 +217,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final menuItems = _menuItems;
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: CustomNavigationDrawer(
+        user: widget.user,
+        onDashboardTap: _onDrawerDashboardTap,
+      ),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         title: Text(
-          'Egurrola Dance Studio',
+          'Egurrola D|S',
           style: GoogleFonts.lato(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF1F2937),
+            fontWeight: FontWeight.w400,
+            color: const Color(0xFFCC0033),
           ),
         ),
         backgroundColor: Colors.white,
@@ -289,7 +245,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   Icons.notifications_outlined,
                   color: Color(0xFFE20613),
                 ),
-                // Notification badge (example - you can make this dynamic)
                 Positioned(
                   right: 0,
                   top: 0,
@@ -317,7 +272,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ],
             ),
             onPressed: () {
-              // TODO: Navigate to notifications screen
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -328,12 +282,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
               );
             },
-          ),
-          // Logout icon
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFE20613)),
-            onPressed: _handleLogout,
-            tooltip: 'Wyloguj',
           ),
         ],
       ),
