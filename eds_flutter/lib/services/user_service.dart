@@ -164,4 +164,174 @@ class UserService {
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
     }
   }
+
+  // Fetch payment history
+  Future<Map<String, dynamic>> getPaymentHistory(String parentGuid) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        AuthService.logoutAndRedirect();
+        return {'success': false, 'message': 'Brak autoryzacji'};
+      }
+
+      final url = '${AuthService.baseUrl}/api/payments/history/$parentGuid';
+      print('🔵 [USER] Fetching payment history from: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print(
+        '🟢 [USER] Payment history response status: ${response.statusCode}',
+      );
+      print('📄 [USER] Payment history body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        var historyData = data;
+        if (data['body'] != null) {
+          historyData = data['body'];
+        }
+        if (historyData['data'] != null) {
+          historyData = historyData['data'];
+        }
+        return {'success': true, 'data': historyData};
+      } else if (response.statusCode == 401) {
+        AuthService.logoutAndRedirect();
+        return {
+          'success': false,
+          'message': 'Sesja wygasła. Zaloguj się ponownie.',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Błąd pobierania historii: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('🔴 [USER] Payment History Exception: $e');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // Fetch user relations
+
+  Future<Map<String, dynamic>> getUsersRelations(String parentGuid) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        AuthService.logoutAndRedirect();
+        return {'success': false, 'message': 'Brak autoryzacji'};
+      }
+
+      final url = '${AuthService.baseUrl}/api/users-relations/$parentGuid';
+      print('🔵 [USER] Fetching relations from: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('🟢 [USER] Relations response status: ${response.statusCode}');
+      print('📄 [USER] Relations response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Robust parsing of results
+        dynamic relationsRawData;
+
+        if (data is List) {
+          relationsRawData = data;
+        } else if (data is Map) {
+          // Check for common nesting patterns
+          var bodyData = data['body'] ?? data;
+          relationsRawData =
+              bodyData['data'] ?? bodyData['relations'] ?? bodyData['users'];
+
+          // Fallback if success is explicitly false
+          if (data['success'] == false ||
+              (data['body'] != null && data['body']['success'] == false)) {
+            return {
+              'success': false,
+              'message':
+                  data['message'] ??
+                  (data['body'] != null ? data['body']['message'] : null) ??
+                  'Błąd serwera',
+            };
+          }
+        }
+
+        if (relationsRawData is List) {
+          final List<UserProfile> relations = relationsRawData
+              .map((json) => UserProfile.fromJson(json))
+              .toList();
+          return {'success': true, 'relations': relations};
+        } else {
+          return {
+            'success': false,
+            'message': 'Nieoczekiwany format danych: ${data.runtimeType}',
+          };
+        }
+      } else {
+        return {
+          'success': false,
+          'message': 'Błąd pobierania relacji: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('🔴 [USER] Relations Exception: $e');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // Update user profile
+  Future<Map<String, dynamic>> updateUserProfile(
+    String guid,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        AuthService.logoutAndRedirect();
+        return {'success': false, 'message': 'Brak autoryzacji'};
+      }
+
+      final url = '${AuthService.baseUrl}/api/user/profile/$guid';
+      print('🔵 [USER] Updating profile at: $url');
+
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(data),
+      );
+
+      print('🟢 [USER] Update response status: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return {'success': true};
+      } else {
+        return {
+          'success': false,
+          'message': 'Błąd aktualizacji profilu: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      print('🔴 [USER] Update Exception: $e');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
 }

@@ -139,4 +139,170 @@ class AuthService {
       );
     }
   }
+
+  // ─── SMS OTP ──────────────────────────────────────────────────────────────
+
+  /// Wysyła kod OTP na podany numer telefonu.
+  Future<Map<String, dynamic>> sendSmsOtp(String phone) async {
+    try {
+      final url = '$baseUrl/api/sms/send';
+      print('🔵 [AUTH] Sending OTP to: $url with phone: $phone');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'phone': phone}),
+      );
+      print('🟢 [AUTH] sendSmsOtp status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return {'success': true};
+      }
+      final body = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Błąd wysyłki SMS',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  /// Weryfikuje kod OTP.
+  Future<Map<String, dynamic>> verifySmsOtp(String phone, String code) async {
+    try {
+      final url = '$baseUrl/api/sms/verify';
+      print('🔵 [AUTH] Verifying OTP at: $url for phone: $phone');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'phone': phone, 'code': code}),
+      );
+      print('🟢 [AUTH] verifySmsOtp status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'otp_token': data['otp_token']};
+      }
+      final body = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Nieprawidłowy kod SMS',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // ─── Rejestracja ──────────────────────────────────────────────────────────
+
+  /// Zakłada nowe konto po zweryfikowaniu OTP.
+  Future<Map<String, dynamic>> registerAccount({
+    required String phone,
+    required String otpToken,
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final url = '$baseUrl/api/register';
+      print(
+        '🔵 [AUTH] Registering account at: $url for email: $email, phone: $phone',
+      );
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'phone': phone,
+          'otp_token': otpToken,
+          'first_name': firstName,
+          'last_name': lastName,
+          'email': email,
+          'password': password,
+        }),
+      );
+      print('🟢 [AUTH] registerAccount status: ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+      final body = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Błąd rejestracji',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // ─── Reset hasła ──────────────────────────────────────────────────────────
+
+  /// Inicjuje reset hasła – wysyła OTP na telefon.
+  Future<Map<String, dynamic>> resetPasswordRequest(String phone) async {
+    try {
+      final url = '$baseUrl/api/password/reset';
+      print('🔵 [AUTH] Password reset request at: $url for phone: $phone');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'phone': phone}),
+      );
+      print('🟢 [AUTH] resetPasswordRequest status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return {'success': true};
+      }
+      final body = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Nie znaleziono konta',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  /// Zatwierdza nowe hasło po weryfikacji OTP.
+  Future<Map<String, dynamic>> resetPasswordConfirm({
+    required String phone,
+    required String otpToken,
+    required String newPassword,
+  }) async {
+    try {
+      final url = '$baseUrl/api/password/reset/confirm';
+      print('🔵 [AUTH] Confirming password reset at: $url for phone: $phone');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'phone': phone,
+          'otp_token': otpToken,
+          'password': newPassword,
+        }),
+      );
+      print('🟢 [AUTH] resetPasswordConfirm status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return {'success': true};
+      }
+      final body = jsonDecode(response.body);
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Błąd zmiany hasła',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
 }

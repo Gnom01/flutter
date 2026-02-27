@@ -33,25 +33,35 @@ class UserProfile {
     required this.address,
   });
 
-  String get fullName => '$firstName $lastName';
+  String get fullName {
+    if (firstName.isEmpty && lastName.isEmpty && address.isNotEmpty) {
+      return address;
+    }
+    return '$firstName $lastName'.trim();
+  }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      guid: json['guid'] ?? json['UsersID']?.toString() ?? '',
-      firstName: json['FirstName'] ?? '',
-      lastName: json['LastName'] ?? '',
-      email: json['Email'] ?? '',
-      phone: json['Phone'] ?? '',
-      dateOfBirth: json['DateOfBirdth'] ?? '',
-      street: json['Street'] ?? '',
-      building: json['Building'] ?? '',
-      flat: json['Flat'] ?? '',
-      city: json['City'] ?? '',
-      postalCode: json['PostalCode'] ?? '',
-      pesel: json['Pesel'] ?? '',
-      genderDvid: json['GenderDVID'] ?? 0,
-      memberCardNumber: json['MemberCardNumber'] ?? '',
-      address: json['address'] ?? '',
+      guid:
+          json['guid'] ??
+          json['UsersID']?.toString() ??
+          json['id']?.toString() ??
+          '',
+      firstName: json['FirstName'] ?? json['first_name'] ?? '',
+      lastName: json['LastName'] ?? json['last_name'] ?? '',
+      email: json['Email'] ?? json['email'] ?? '',
+      phone: json['Phone'] ?? json['phone'] ?? '',
+      dateOfBirth: json['DateOfBirdth'] ?? json['date_of_birth'] ?? '',
+      street: json['Street'] ?? json['street'] ?? '',
+      building: json['Building'] ?? json['building'] ?? '',
+      flat: json['Flat'] ?? json['flat'] ?? '',
+      city: json['City'] ?? json['city'] ?? '',
+      postalCode: json['PostalCode'] ?? json['postal_code'] ?? '',
+      pesel: json['Pesel'] ?? json['pesel'] ?? '',
+      genderDvid: json['GenderDVID'] ?? json['gender_dvid'] ?? 0,
+      memberCardNumber:
+          json['MemberCardNumber'] ?? json['member_card_number'] ?? '',
+      address: json['address'] ?? json['fullName'] ?? '',
     );
   }
 
