@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'providers/user_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'services/auth_service.dart';
@@ -26,20 +28,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'Panel Klienta - EDS',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE20613),
-          primary: const Color(0xFFE20613),
-          brightness: Brightness.light,
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => UserProvider())],
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        title: 'Panel Klienta - EDS',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFE20613),
+            primary: const Color(0xFFE20613),
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+          scaffoldBackgroundColor: const Color(0xFFF9FAFB),
         ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+        home: const SplashScreen(),
       ),
-      home: const SplashScreen(),
     );
   }
 }

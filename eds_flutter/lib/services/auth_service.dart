@@ -197,6 +197,55 @@ class AuthService {
     }
   }
 
+  /// Weryfikuje OTP i zwraca listę kont powiązanych z numerem telefonu.
+  Future<Map<String, dynamic>> resetPasswordVerify(
+    String phone,
+    String code,
+  ) async {
+    try {
+      final url = '$baseUrl/api/password/reset/verify';
+      print('🔵 [AUTH] Verifying OTP + fetching accounts at: $url');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'phone': phone, 'code': code}),
+      );
+      print('🟢 [AUTH] resetPasswordVerify status: ${response.statusCode}');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final accounts = (data['accounts'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
+        return {
+          'success': true,
+          'accounts': accounts,
+          'otp_token': data['otp_token'] ?? '',
+        };
+      }
+      final errorCode = data['error'] ?? '';
+      if (errorCode == 'OTP_INVALID') {
+        return {
+          'success': false,
+          'message': 'Kod SMS jest nieprawidłowy lub wygasł',
+        };
+      }
+      if (errorCode == 'NO_ACCOUNTS') {
+        return {
+          'success': false,
+          'message': 'Nie znaleźliśmy konta dla tego numeru',
+        };
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Błąd weryfikacji',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
   // ─── Rejestracja ──────────────────────────────────────────────────────────
 
   /// Zakłada nowe konto po zweryfikowaniu OTP.
@@ -261,6 +310,12 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true};
       }
+      if (response.statusCode == 429) {
+        return {
+          'success': false,
+          'message': 'Zbyt wiele prób. Odczekaj 5 minut przed kolejną próbą.',
+        };
+      }
       final body = jsonDecode(response.body);
       return {
         'success': false,
@@ -271,15 +326,17 @@ class AuthService {
     }
   }
 
-  /// Zatwierdza nowe hasło po weryfikacji OTP.
+  /// Zatwierdza nowy login i hasło po weryfikacji OTP i wyborze konta.
   Future<Map<String, dynamic>> resetPasswordConfirm({
     required String phone,
-    required String otpToken,
-    required String newPassword,
+    required String code,
+    required String guid,
+    required String login,
+    required String password,
   }) async {
     try {
       final url = '$baseUrl/api/password/reset/confirm';
-      print('🔵 [AUTH] Confirming password reset at: $url for phone: $phone');
+      print('🔵 [AUTH] Confirming password reset at: $url for guid: $guid');
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -288,18 +345,28 @@ class AuthService {
         },
         body: jsonEncode({
           'phone': phone,
-          'otp_token': otpToken,
-          'password': newPassword,
+          'code': code,
+          'guid': guid,
+          'login': login,
+          'password': password,
         }),
       );
       print('🟢 [AUTH] resetPasswordConfirm status: ${response.statusCode}');
+      final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
         return {'success': true};
       }
-      final body = jsonDecode(response.body);
+      final errorCode = data['error'] ?? '';
+      final errorMessages = {
+        'OTP_INVALID': 'Kod SMS jest nieprawidłowy lub wygasł',
+        'ACCOUNT_NOT_MATCH_PHONE':
+            'Wybrane konto nie należy do tego numeru telefonu',
+        'CRM_ERROR': 'Błąd zapisu do systemu. Spróbuj ponownie.',
+      };
       return {
         'success': false,
-        'message': body['message'] ?? 'Błąd zmiany hasła',
+        'message':
+            errorMessages[errorCode] ?? data['message'] ?? 'Błąd zmiany hasła',
       };
     } catch (e) {
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};

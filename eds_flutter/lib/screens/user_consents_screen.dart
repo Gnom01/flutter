@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/user_consents.dart';
-import '../services/user_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class UserConsentsScreen extends StatefulWidget {
   const UserConsentsScreen({super.key});
@@ -10,47 +10,16 @@ class UserConsentsScreen extends StatefulWidget {
 }
 
 class _UserConsentsScreenState extends State<UserConsentsScreen> {
-  final UserService _userService = UserService();
-  bool _isLoading = true;
-  UserConsents? _consents;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
-    _fetchConsents();
-  }
-
-  Future<void> _fetchConsents() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final result = await _userService.getUserConsents();
-      if (result['success']) {
-        setState(() {
-          _consents = result['consents'];
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = result['message'];
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Błąd: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+    Future.microtask(() => context.read<UserProvider>().fetchConsents());
   }
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
+    final provider = context.watch<UserProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -63,15 +32,15 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
-      body: _isLoading
+      body: provider.isLoadingConsents && provider.consents == null
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView()
-          : _buildConsentsView(primaryColor),
+          : provider.consentsError != null && provider.consents == null
+          ? _buildErrorView(provider)
+          : _buildConsentsView(primaryColor, provider),
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView(UserProvider provider) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -81,13 +50,13 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
             const Icon(Icons.error_outline, size: 60, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              _errorMessage ?? 'Wystąpił nieoczekiwany błąd',
+              provider.consentsError ?? 'Wystąpił nieoczekiwany błąd',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _fetchConsents,
+              onPressed: () => provider.fetchConsents(forceRefresh: true),
               child: const Text('Spróbuj ponownie'),
             ),
           ],
@@ -96,11 +65,12 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
     );
   }
 
-  Widget _buildConsentsView(Color primaryColor) {
-    if (_consents == null) return const SizedBox.shrink();
+  Widget _buildConsentsView(Color primaryColor, UserProvider provider) {
+    final consents = provider.consents;
+    if (consents == null) return const SizedBox.shrink();
 
     return RefreshIndicator(
-      onRefresh: _fetchConsents,
+      onRefresh: () => provider.fetchConsents(forceRefresh: true),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
@@ -118,7 +88,7 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
 
             _buildConsentCard(
               title: 'Zgoda na przetwarzanie danych osobowych *',
-              value: _consents!.personalDataProcessingConsent,
+              value: consents.personalDataProcessingConsent,
               onChanged: (val) {
                 // In a real app, we would call an API to update this
                 print('Update personalDataProcessingConsent to $val');
@@ -130,7 +100,7 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
 
             _buildConsentCard(
               title: 'Zgoda na SMS/email/telefon',
-              value: _consents!.consentReceiveSmsEmailPhone,
+              value: consents.consentReceiveSmsEmailPhone,
               onChanged: (val) {
                 print('Update consentReceiveSmsEmailPhone to $val');
               },
@@ -140,7 +110,7 @@ class _UserConsentsScreenState extends State<UserConsentsScreen> {
 
             _buildConsentCard(
               title: 'Zgoda marketingowa',
-              value: _consents!.marketingAgreement,
+              value: consents.marketingAgreement,
               onChanged: (val) {
                 print('Update marketingAgreement to $val');
               },

@@ -255,19 +255,28 @@ class UserService {
         } else if (data is Map) {
           // Check for common nesting patterns
           var bodyData = data['body'] ?? data;
-          relationsRawData =
-              bodyData['data'] ?? bodyData['relations'] ?? bodyData['users'];
 
-          // Fallback if success is explicitly false
-          if (data['success'] == false ||
-              (data['body'] != null && data['body']['success'] == false)) {
-            return {
-              'success': false,
-              'message':
-                  data['message'] ??
-                  (data['body'] != null ? data['body']['message'] : null) ??
-                  'Błąd serwera',
-            };
+          if (bodyData is List) {
+            relationsRawData = bodyData;
+          } else if (bodyData is Map) {
+            relationsRawData =
+                bodyData['data'] ?? bodyData['relations'] ?? bodyData['users'];
+
+            // Fallback if success is explicitly false
+            if (data['success'] == false ||
+                (data['body'] != null &&
+                    data['body'] is Map &&
+                    data['body']['success'] == false)) {
+              return {
+                'success': false,
+                'message':
+                    data['message'] ??
+                    (data['body'] != null && data['body'] is Map
+                        ? data['body']['message']
+                        : null) ??
+                    'Błąd serwera',
+              };
+            }
           }
         }
 
@@ -282,6 +291,12 @@ class UserService {
             'message': 'Nieoczekiwany format danych: ${data.runtimeType}',
           };
         }
+      } else if (response.statusCode == 401) {
+        AuthService.logoutAndRedirect();
+        return {
+          'success': false,
+          'message': 'Sesja wygasła. Zaloguj się ponownie.',
+        };
       } else {
         return {
           'success': false,
@@ -331,6 +346,82 @@ class UserService {
       }
     } catch (e) {
       print('🔴 [USER] Update Exception: $e');
+      return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
+    }
+  }
+
+  // Update user credentials (login/password for linked person)
+  Future<Map<String, dynamic>> updateUserCredentials(
+    String guid,
+    String login,
+    String password,
+  ) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        AuthService.logoutAndRedirect();
+        return {'success': false, 'message': 'Brak autoryzacji'};
+      }
+
+      // TODO: URL i struktura do poprawki, jak ustalimy formę z backendem
+      // To jest założenie tymczasowe:
+      final url = '${AuthService.baseUrl}/api/users/$guid/credentials';
+      print('🔵 [USER] Updating credentials at: $url');
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'login': login, 'password': password}),
+      );
+
+      print(
+        '🟢 [USER] Credentials update response status: ${response.statusCode}',
+      );
+      print('📄 [USER] Credentials update payload: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        final data = jsonDecode(response.body);
+        if (data['ok'] == true) {
+          return {
+            'success': true,
+            'message': data['message'] ?? 'Zapisano pomyślnie',
+          };
+        } else {
+          return {
+            'success': false,
+            'message': data['message'] ?? 'Błąd zapisu danych',
+          };
+        }
+      } else if (response.statusCode == 401) {
+        AuthService.logoutAndRedirect();
+        return {
+          'success': false,
+          'message': 'Sesja wygasła. Zaloguj się ponownie.',
+        };
+      } else if (response.statusCode == 403) {
+        return {
+          'success': false,
+          'message':
+              'Brak uprawnień. Upewnij się, że modyfikujesz powiązane konto.',
+        };
+      } else {
+        // Fallback for other errors, parsing body if possible
+        String errorMsg = 'Błąd aktualizacji: ${response.statusCode}';
+        try {
+          final errData = jsonDecode(response.body);
+          if (errData['message'] != null) {
+            errorMsg = errData['message'];
+          }
+        } catch (_) {}
+
+        return {'success': false, 'message': errorMsg};
+      }
+    } catch (e) {
+      print('🔴 [USER] Credentials Update Exception: $e');
       return {'success': false, 'message': 'Błąd połączenia: ${e.toString()}'};
     }
   }

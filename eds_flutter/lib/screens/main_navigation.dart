@@ -73,10 +73,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           screen: const ParentPaymentsScreen(),
         ),
         NavigationItem(
-          label: 'Osoby',
-          icon: Icons.people_outline,
-          selectedIcon: Icons.people,
-          screen: const ParentRelatedPersonsScreen(),
+          label: 'Kalendarz',
+          icon: Icons.calendar_today_outlined,
+          selectedIcon: Icons.calendar_today,
+          screen: const ParentScheduleScreen(),
         ),
         NavigationItem(
           label: 'Oferty',
@@ -144,12 +144,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildMoreMenuItem(
-            icon: Icons.calendar_today_outlined,
-            title: 'Kalendarz zajęć',
+            icon: Icons.people_outline,
+            title: 'Osoby powiązane',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const ParentScheduleScreen(),
+                builder: (context) => const ParentRelatedPersonsScreen(),
               ),
             ),
           ),

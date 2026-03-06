@@ -1,4 +1,4 @@
-# eds_flutter
+# egurrola_dance_school
 
 A new Flutter project.
 

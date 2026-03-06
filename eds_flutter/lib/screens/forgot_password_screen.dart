@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 import '../services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -10,21 +11,28 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+    with CodeAutoFill {
   final _authService = AuthService();
 
+  // 0 = phone, 1 = OTP, 2 = account selection, 3 = email + password
   int _step = 0;
   bool _isLoading = false;
 
-  // Step 1 – phone
+  // Step 0 – phone
   final _phoneController = TextEditingController();
   String _phone = '';
 
-  // Step 2 – OTP
+  // Step 1 – OTP
   final _otpController = TextEditingController();
   String _otpToken = '';
 
-  // Step 3 – new password
+  // Step 2 – account selection
+  List<Map<String, dynamic>> _accounts = [];
+  Map<String, dynamic>? _selectedAccount;
+
+  // Step 3 – email + new password
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -33,16 +41,45 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKeys = [
     GlobalKey<FormState>(),
     GlobalKey<FormState>(),
+    GlobalKey<
+      FormState
+    >(), // not used for account list but kept for index alignment
     GlobalKey<FormState>(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Print app signature for backend SMS template
+    SmsAutoFill().getAppSignature.then((signature) {
+      print('🔑 [SMS] App Signature Hash: $signature');
+    });
+  }
+
+  @override
   void dispose() {
+    cancel();
+    unregisterListener();
     _phoneController.dispose();
     _otpController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void codeUpdated() {
+    if (code != null && code!.length >= 4) {
+      _otpController.text = code!;
+      setState(() {});
+      // Auto-submit after receiving code
+      _verifyOtpAndFetchAccounts();
+    }
+  }
+
+  void _startListeningForSms() {
+    listenForCode();
   }
 
   // ─── Step handlers ────────────────────────────────────────────────────────
@@ -56,35 +93,66 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!mounted) return;
     if (result['success'] == true) {
       setState(() => _step = 1);
+      _startListeningForSms();
     } else {
       _showError(result['message'] ?? 'Nie znaleziono konta');
     }
   }
 
-  Future<void> _verifyOtp() async {
+  Future<void> _verifyOtpAndFetchAccounts() async {
     if (!_formKeys[1].currentState!.validate()) return;
     setState(() => _isLoading = true);
-    final result = await _authService.verifySmsOtp(
+    final result = await _authService.resetPasswordVerify(
       _phone,
       _otpController.text.trim(),
     );
     setState(() => _isLoading = false);
     if (!mounted) return;
     if (result['success'] == true) {
-      _otpToken = result['otp_token'] ?? '';
-      setState(() => _step = 2);
+      _otpToken = _otpController.text.trim();
+      final accounts = (result['accounts'] as List)
+          .cast<Map<String, dynamic>>();
+      if (accounts.isEmpty) {
+        _showError('Nie znaleźliśmy konta dla tego numeru');
+        return;
+      }
+      _accounts = accounts;
+      if (accounts.length == 1) {
+        // Auto-select the only account and skip to step 3
+        _selectAccount(accounts.first);
+      } else {
+        setState(() => _step = 2);
+      }
     } else {
-      _showError(result['message'] ?? 'Nieprawidłowy kod SMS');
+      _showError(result['message'] ?? 'Błąd weryfikacji');
     }
   }
 
+  void _selectAccount(Map<String, dynamic> account) {
+    print('🟡 [RESET] Selected account object: $account');
+    print('🟡 [RESET] Account keys: ${account.keys.toList()}');
+    _selectedAccount = account;
+    _emailController.text = account['Email'] ?? '';
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    setState(() => _step = 3);
+  }
+
   Future<void> _confirmReset() async {
-    if (!_formKeys[2].currentState!.validate()) return;
+    if (!_formKeys[3].currentState!.validate()) return;
     setState(() => _isLoading = true);
+    print('🟡 [RESET] Confirm data:');
+    print('🟡 [RESET]   phone: $_phone');
+    print('🟡 [RESET]   code: $_otpToken');
+    print('🟡 [RESET]   guid: ${_selectedAccount!['guid']}');
+    print('🟡 [RESET]   login: ${_emailController.text.trim()}');
+    print('🟡 [RESET]   selectedAccount: $_selectedAccount');
     final result = await _authService.resetPasswordConfirm(
       phone: _phone,
-      otpToken: _otpToken,
-      newPassword: _passwordController.text,
+      code: _otpToken,
+      guid: _selectedAccount!['guid'] ?? '',
+      login: _emailController.text.trim(),
+      password: _passwordController.text,
     );
     setState(() => _isLoading = false);
     if (!mounted) return;
@@ -150,7 +218,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
             onPressed: () {
               if (_step > 0) {
-                setState(() => _step--);
+                // If going back from step 3 and there was only 1 account,
+                // go back to OTP step (skip account selection)
+                if (_step == 3 && _accounts.length <= 1) {
+                  setState(() => _step = 1);
+                } else {
+                  setState(() => _step--);
+                }
               } else {
                 Navigator.of(context).pop();
               }
@@ -174,18 +248,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Widget _buildStepIndicator() {
-    const labels = ['Telefon', 'Kod SMS', 'Hasło'];
+    const labels = ['Telefon', 'Kod SMS', 'Konto', 'Hasło'];
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(3, (i) {
+        children: List.generate(4, (i) {
           final active = i <= _step;
           return Row(
             children: [
               if (i > 0)
                 Container(
-                  width: 40,
+                  width: 32,
                   height: 2,
                   color: active ? const Color(0xFFE20613) : Colors.white30,
                 ),
@@ -256,12 +330,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: switch (_step) {
         0 => _buildPhoneStep(),
         1 => _buildOtpStep(),
+        2 => _buildAccountSelectionStep(),
         _ => _buildNewPasswordStep(),
       },
     );
   }
 
-  // ─── Step 1 – Phone ────────────────────────────────────────────────────────
+  // ─── Step 0 – Phone ────────────────────────────────────────────────────────
 
   Widget _buildPhoneStep() {
     return Form(
@@ -301,7 +376,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ─── Step 2 – OTP ──────────────────────────────────────────────────────────
+  // ─── Step 1 – OTP ──────────────────────────────────────────────────────────
 
   Widget _buildOtpStep() {
     return Form(
@@ -347,7 +422,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           const SizedBox(height: 16),
           _primaryButton(
             label: 'Potwierdź',
-            onPressed: _verifyOtp,
+            onPressed: _verifyOtpAndFetchAccounts,
             isLoading: _isLoading,
           ),
         ],
@@ -355,16 +430,146 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ─── Step 3 – New password ─────────────────────────────────────────────────
+  // ─── Step 2 – Account selection ────────────────────────────────────────────
+
+  Widget _buildAccountSelectionStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepTitle('Wybierz konto'),
+        const SizedBox(height: 8),
+        Text(
+          'Znaleźliśmy ${_accounts.length} kont powiązanych z tym numerem telefonu. '
+          'Wybierz konto, na którym chcesz zmienić hasło.',
+          style: GoogleFonts.lato(color: Colors.grey.shade600, fontSize: 14),
+        ),
+        const SizedBox(height: 20),
+        ..._accounts.map((account) {
+          final firstName = account['FirstName'] ?? '';
+          final lastName = account['LastName'] ?? '';
+          final email = account['Email'] ?? '';
+          final fullName = '$firstName $lastName'.trim();
+          final displayName = fullName.isNotEmpty ? fullName : email;
+          final subtitle = fullName.isNotEmpty ? email : '';
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _selectAccount(account),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE20613).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            (firstName.isNotEmpty
+                                    ? firstName[0]
+                                    : email.isNotEmpty
+                                    ? email[0]
+                                    : '?')
+                                .toUpperCase(),
+                            style: GoogleFonts.lato(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE20613),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: GoogleFonts.lato(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1F2937),
+                              ),
+                            ),
+                            if (subtitle.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: GoogleFonts.lato(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  // ─── Step 3 – Email + new password ─────────────────────────────────────────
 
   Widget _buildNewPasswordStep() {
+    final accountName =
+        '${_selectedAccount?['first_name'] ?? ''} ${_selectedAccount?['last_name'] ?? ''}'
+            .trim();
+
     return Form(
-      key: _formKeys[2],
+      key: _formKeys[3],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle('Ustaw nowe hasło'),
+          _stepTitle('Ustaw login i hasło'),
+          if (accountName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Konto: $accountName',
+              style: GoogleFonts.lato(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: _inputDecoration(
+              label: 'Email (login)',
+              icon: Icons.email_outlined,
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Wprowadź adres email';
+              if (!v.contains('@')) return 'Wprowadź poprawny adres email';
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,

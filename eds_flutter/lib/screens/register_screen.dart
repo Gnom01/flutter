@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -10,7 +11,7 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen> with CodeAutoFill {
   final _authService = AuthService();
 
   // Step management (0 = phone, 1 = OTP, 2 = personal details)
@@ -41,7 +42,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    SmsAutoFill().getAppSignature.then((signature) {
+      print('🔑 [SMS] App Signature Hash: $signature');
+    });
+  }
+
+  @override
   void dispose() {
+    cancel();
+    unregisterListener();
     _phoneController.dispose();
     _otpController.dispose();
     _firstNameController.dispose();
@@ -50,6 +61,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void codeUpdated() {
+    if (code != null && code!.length >= 4) {
+      _otpController.text = code!;
+      setState(() {});
+      _verifyOtp();
+    }
+  }
+
+  void _startListeningForSms() {
+    listenForCode();
   }
 
   // ─── Step handlers ────────────────────────────────────────────────────────
@@ -63,6 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     if (result['success'] == true) {
       setState(() => _step = 1);
+      _startListeningForSms();
     } else {
       _showError(result['message'] ?? 'Błąd wysyłki SMS');
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
-import '../services/user_service.dart';
+import '../providers/user_provider.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -10,47 +11,16 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  final UserService _userService = UserService();
-  bool _isLoading = true;
-  UserProfile? _profile;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
-    _fetchProfile();
-  }
-
-  Future<void> _fetchProfile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final result = await _userService.getUserProfile();
-      if (result['success']) {
-        setState(() {
-          _profile = result['profile'];
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = result['message'];
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Błąd: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+    Future.microtask(() => context.read<UserProvider>().fetchProfile());
   }
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
+    final provider = context.watch<UserProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -63,15 +33,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
-      body: _isLoading
+      body: provider.isLoadingProfile && provider.profile == null
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView()
-          : _buildProfileView(primaryColor),
+          : provider.profileError != null && provider.profile == null
+          ? _buildErrorView(provider)
+          : _buildProfileView(primaryColor, provider),
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView(UserProvider provider) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -81,13 +51,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             const Icon(Icons.error_outline, size: 60, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              _errorMessage ?? 'Wystąpił nieoczekiwany błąd',
+              provider.profileError ?? 'Wystąpił nieoczekiwany błąd',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _fetchProfile,
+              onPressed: () => provider.fetchProfile(forceRefresh: true),
               child: const Text('Spróbuj ponownie'),
             ),
           ],
@@ -96,18 +66,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildProfileView(Color primaryColor) {
-    if (_profile == null) return const SizedBox.shrink();
+  Widget _buildProfileView(Color primaryColor, UserProvider provider) {
+    final profile = provider.profile;
+    if (profile == null) return const SizedBox.shrink();
 
     return RefreshIndicator(
-      onRefresh: _fetchProfile,
+      onRefresh: () => provider.fetchProfile(forceRefresh: true),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             // Header with Avatar
-            _buildProfileHeader(primaryColor),
+            _buildProfileHeader(primaryColor, profile),
             const SizedBox(height: 24),
 
             // Personal Info Card
@@ -115,14 +86,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               title: 'Dane osobowe',
               icon: Icons.person_outline,
               items: [
-                _buildInfoRow('Imię i nazwisko', _profile!.fullName),
-                _buildInfoRow('PESEL', _profile!.pesel),
-                _buildInfoRow('Data urodzenia', _profile!.dateOfBirth),
+                _buildInfoRow('Imię i nazwisko', profile.fullName),
+                _buildInfoRow('PESEL', profile.pesel),
+                _buildInfoRow('Data urodzenia', profile.dateOfBirth),
                 _buildInfoRow(
                   'Nr karty',
-                  _profile!.memberCardNumber.isEmpty
+                  profile.memberCardNumber.isEmpty
                       ? 'Brak'
-                      : _profile!.memberCardNumber,
+                      : profile.memberCardNumber,
                 ),
               ],
             ),
@@ -133,8 +104,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               title: 'Dane kontaktowe',
               icon: Icons.contact_mail_outlined,
               items: [
-                _buildInfoRow('Email', _profile!.email),
-                _buildInfoRow('Telefon', _profile!.phone),
+                _buildInfoRow('Email', profile.email),
+                _buildInfoRow('Telefon', profile.phone),
               ],
             ),
             const SizedBox(height: 16),
@@ -146,11 +117,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               items: [
                 _buildInfoRow(
                   'Ulica',
-                  '${_profile!.street} ${_profile!.building}${_profile!.flat.isNotEmpty ? '/${_profile!.flat}' : ''}',
+                  '${profile.street} ${profile.building}${profile.flat.isNotEmpty ? '/${profile.flat}' : ''}',
                 ),
                 _buildInfoRow(
                   'Miasto',
-                  '${_profile!.postalCode} ${_profile!.city}',
+                  '${profile.postalCode} ${profile.city}',
                 ),
               ],
             ),
@@ -161,7 +132,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(Color primaryColor) {
+  Widget _buildProfileHeader(Color primaryColor, UserProfile profile) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -182,7 +153,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             radius: 50,
             backgroundColor: primaryColor.withOpacity(0.1),
             child: Text(
-              _profile!.firstName.isNotEmpty ? _profile!.firstName[0] : 'U',
+              profile.firstName.isNotEmpty ? profile.firstName[0] : 'U',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -192,12 +163,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            _profile!.fullName,
+            profile.fullName,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
-            _profile!.email,
+            profile.email,
             style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],

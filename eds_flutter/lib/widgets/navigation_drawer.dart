@@ -132,6 +132,13 @@ class CustomNavigationDrawer extends StatelessWidget {
                   title: 'Twoje dane',
                   onTap: () => _navigateTo(context, const UserProfileScreen()),
                 ),
+                if (user.isParent)
+                  _buildDrawerItem(
+                    icon: Icons.vpn_key_outlined,
+                    title: 'Dostępy osób powiązanych',
+                    onTap: () =>
+                        _navigateTo(context, const ParentLinkedAccessScreen()),
+                  ),
                 _buildDrawerItem(
                   icon: Icons.settings_outlined,
                   title: 'Ustawienia',

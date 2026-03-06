@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../services/user_service.dart';
-import '../../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
 import '../../models/user_profile.dart';
 import '../user_edit_screen.dart';
 import '../../widgets/placeholder_screen.dart';
 import '../payment_schedule_screen.dart';
+
+export 'parent_linked_access_screen.dart';
 
 // Related Persons Screen
 class ParentRelatedPersonsScreen extends StatefulWidget {
@@ -17,56 +19,16 @@ class ParentRelatedPersonsScreen extends StatefulWidget {
 
 class _ParentRelatedPersonsScreenState
     extends State<ParentRelatedPersonsScreen> {
-  final UserService _userService = UserService();
-  final AuthService _authService = AuthService();
-  List<UserProfile>? _relations;
-  bool _isLoading = true;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
-    _fetchRelations();
-  }
-
-  Future<void> _fetchRelations() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final user = await _authService.getCurrentUser();
-      if (user == null) {
-        setState(() {
-          _errorMessage = 'Nie znaleziono danych użytkownika';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final result = await _userService.getUsersRelations(user.guid);
-      if (result['success']) {
-        setState(() {
-          _relations = result['relations'];
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = result['message'];
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Błąd: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+    Future.microtask(() => context.read<UserProvider>().fetchRelations());
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<UserProvider>();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -80,19 +42,19 @@ class _ParentRelatedPersonsScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _fetchRelations,
+            onPressed: () => provider.fetchRelations(forceRefresh: true),
           ),
         ],
       ),
-      body: _isLoading
+      body: provider.isLoadingRelations && provider.relations == null
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? _buildErrorView()
-          : _buildRelationsList(),
+          : provider.relationsError != null && provider.relations == null
+          ? _buildErrorView(provider)
+          : _buildRelationsList(provider),
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView(UserProvider provider) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -102,13 +64,13 @@ class _ParentRelatedPersonsScreenState
             const Icon(Icons.error_outline, size: 60, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              _errorMessage ?? 'Wystąpił nieoczekiwany błąd',
+              provider.relationsError ?? 'Wystąpił nieoczekiwany błąd',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _fetchRelations,
+              onPressed: () => provider.fetchRelations(forceRefresh: true),
               child: const Text('Spróbuj ponownie'),
             ),
           ],
@@ -117,22 +79,27 @@ class _ParentRelatedPersonsScreenState
     );
   }
 
-  Widget _buildRelationsList() {
-    if (_relations == null || _relations!.isEmpty) {
+  Widget _buildRelationsList(UserProvider provider) {
+    final relations = provider.relations;
+    if (relations == null || relations.isEmpty) {
       return const Center(child: Text('Brak powiązanych osób'));
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _relations!.length,
-      itemBuilder: (context, index) {
-        final profile = _relations![index];
-        return _buildRelationCard(profile);
-      },
+    return RefreshIndicator(
+      onRefresh: () => provider.fetchRelations(forceRefresh: true),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: relations.length,
+        itemBuilder: (context, index) {
+          final profile = relations[index];
+          return _buildRelationCard(profile, provider);
+        },
+      ),
     );
   }
 
-  Widget _buildRelationCard(UserProfile profile) {
+  Widget _buildRelationCard(UserProfile profile, UserProvider provider) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -195,7 +162,7 @@ class _ParentRelatedPersonsScreenState
                 ),
               );
               if (result == true) {
-                _fetchRelations();
+                provider.fetchRelations(forceRefresh: true);
               }
             },
           ),
